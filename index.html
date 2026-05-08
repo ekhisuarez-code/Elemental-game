@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elemental Game</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0d0d0d}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  color:#ccc;display:flex;flex-direction:column;user-select:none;font-size:12px}
+
+/* ══ CANVAS ══ */
+#cbox{position:fixed;top:0;left:0;right:224px;bottom:48px;background:#000;overflow:hidden}
+canvas{display:block;width:100%;height:100%;cursor:crosshair;background:#000;image-rendering:pixelated}
+#pauseOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.65);font-size:32px;font-weight:200;color:rgba(255,255,255,.3);
+  letter-spacing:10px;pointer-events:none}
+#ring{position:absolute;pointer-events:none;border:1.5px solid rgba(255,255,255,.7);
+  border-radius:50%;transform:translate(-50%,-50%);display:none;transition:width .04s,height .04s}
+
+/* ══ RIGHT PANEL ══ */
+#panel{position:fixed;top:0;right:0;bottom:48px;width:224px;
+  background:#141414;border-left:1px solid #252525;
+  display:flex;flex-direction:column;overflow:hidden;z-index:50}
+
+/* panel tabs */
+#tabs{display:flex;background:#0e0e0e;border-bottom:1px solid #1e1e1e;flex-shrink:0;height:36px}
+.ptab{flex:1;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  color:#333;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border-bottom:2px solid transparent;transition:all .12s;gap:3px;position:relative}
+.ptab:hover{color:#666;background:#141414}
+.ptab.on{color:#ccc;border-bottom-color:#666;background:#141414}
+.ptab .ti{font-size:11px}
+.ptab .nbadge{min-width:15px;height:13px;border-radius:7px;background:#2a4a2a;color:#5a9a5a;
+  font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
+  padding:0 3px;line-height:1}
+
+.tpage{display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0}
+.tpage.on{display:flex}
+
+/* ── SEARCH ── */
+#searchbox{padding:7px 8px 6px;border-bottom:1px solid #1e1e1e;background:#141414;flex-shrink:0}
+#searchWrap{position:relative}
+#searchIcon{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:10px;color:#333;pointer-events:none}
+#searchInput{width:100%;height:26px;padding:0 9px 0 28px;background:#1e1e1e;
+  border:1px solid #2a2a2a;border-radius:4px;color:#bbb;font-size:11px;
+  font-family:inherit;outline:none;transition:border-color .12s,background .12s}
+#searchInput::placeholder{color:#3a3a3a}
+#searchInput:focus{border-color:#3a5a7a;background:#222}
+
+/* ── ELEMENT LIST ── */
+#elist{overflow-y:auto;flex:1;min-height:0}
+#elist::-webkit-scrollbar{width:4px}
+#elist::-webkit-scrollbar-track{background:#141414}
+#elist::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px}
+#elist::-webkit-scrollbar-thumb:hover{background:#383838}
+
+.chdr{display:flex;align-items:center;gap:5px;
+  padding:4px 10px;background:#1a1a1a;border-bottom:1px solid #212121;
+  font-size:8.5px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:#3a3a3a;cursor:pointer;position:sticky;top:0;z-index:5;transition:all .1s;
+  border-left:2px solid transparent}
+.chdr:hover{background:#1e1e1e;color:#555}
+.chdr.open{border-left-color:var(--cc,#3a5a7a)}
+.chdr .ch{margin-left:auto;font-size:7px;opacity:.3;transition:transform .15s}
+.chdr.open .ch{transform:rotate(180deg)}
+.chdr .ccount{font-size:7.5px;opacity:.25;font-weight:500;letter-spacing:0;
+  background:#252525;border-radius:8px;padding:1px 5px}
+.cbody{display:flex;flex-direction:column}
+.cbody.closed{display:none}
+
+.elem{display:flex;align-items:center;gap:7px;padding:4px 10px;height:26px;
+  cursor:pointer;color:#686868;font-size:11px;border-bottom:1px solid #1a1a1a;
+  position:relative;transition:background .07s,color .07s;overflow:hidden;white-space:nowrap}
+.elem:hover{background:#1e1e1e;color:#bbb}
+.elem.on{background:#182230;color:#99bbee}
+.elem.on::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2.5px;
+  background:var(--ec,#3a6aaa)}
+.eswatch{width:12px;height:12px;flex-shrink:0;border-radius:2px;
+  border:1px solid rgba(255,255,255,.07);box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.etag{margin-left:auto;font-size:7px;letter-spacing:.2px;opacity:.2;
+  font-weight:700;text-transform:uppercase;flex-shrink:0}
+.enew{font-size:7px;color:#4a8a4a;background:rgba(74,138,74,.12);
+  border:1px solid rgba(74,138,74,.25);border-radius:2px;padding:0 3px;
+  flex-shrink:0;font-weight:700;letter-spacing:.3px}
+#noRes{padding:28px 12px;font-size:11px;color:#2e2e2e;text-align:center;display:none;line-height:2}
+#noRes .ni{font-size:28px;display:block;opacity:.2;margin-bottom:4px}
+
+/* element preview card */
+#elemPreview{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-bottom:1px solid #1e1e1e;
+  background:#121212;flex-shrink:0;
+}
+#epSwatch{
+  width:32px;height:32px;border-radius:5px;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 0 0 1px rgba(0,0,0,.5);
+  transition:background .2s;
+}
+#epName{font-size:12px;font-weight:700;color:#ccc;margin-bottom:2px}
+#epType{font-size:9px;color:#3a3a3a;text-transform:uppercase;letter-spacing:.8px}
+#reactionsPage{overflow-y:auto;flex:1;min-height:0}
+#reactionsPage::-webkit-scrollbar{width:4px}
+#reactionsPage::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px}
+.rsec{padding:5px 10px;font-size:7.5px;font-weight:800;letter-spacing:2.5px;
+  text-transform:uppercase;color:#2e2e2e;background:#141414;
+  border-bottom:1px solid #1e1e1e;position:sticky;top:0;z-index:2}
+.rxn{display:flex;align-items:center;gap:5px;padding:4px 10px;
+  border-bottom:1px solid #1a1a1a;transition:background .07s}
+.rxn:hover{background:#181818}
+.rdot{width:10px;height:10px;border-radius:2px;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.06)}
+.rarr{font-size:9px;color:#2a2a2a;flex-shrink:0}
+.rdesc{font-size:10px;color:#4a4a4a;line-height:1.35;flex:1}
+.rdesc b{color:#666;display:block;font-size:10.5px}
+.rtag{font-size:7px;color:#2a5a2a;background:rgba(42,90,42,.12);
+  border:1px solid rgba(42,90,42,.2);border-radius:2px;padding:0 3px;
+  flex-shrink:0;letter-spacing:.3px}
+
+/* ── INFO TAB ── */
+#infoPage{overflow-y:auto;flex:1;padding:8px;min-height:0}
+#infoPage::-webkit-scrollbar{width:4px}
+#infoPage::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px}
+.icard{background:#191919;border:1px solid #222;border-radius:5px;padding:8px;margin-bottom:7px}
+.icard h4{font-size:8px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:#2e2e2e;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.icard h4::after{content:'';flex:1;height:1px;background:#222}
+.irow{display:flex;justify-content:space-between;align-items:center;
+  padding:3px 0;border-bottom:1px solid #1f1f1f;font-size:10.5px}
+.irow:last-child{border:none}
+.irow .il{color:#3a3a3a}.irow .iv{color:#777;font-weight:600;font-variant-numeric:tabular-nums}
+.hbar{height:4px;border-radius:2px;background:#1e1e1e;margin:5px 0;overflow:hidden;
+  border:1px solid #222}
+.hfill{height:100%;border-radius:2px;transition:width .9s,background .9s;width:0}
+.hscale{display:flex;justify-content:space-between;font-size:8px;color:#2a2a2a;margin-top:1px}
+.shortcut-row{display:flex;justify-content:space-between;align-items:center;
+  padding:3px 0;border-bottom:1px solid #1f1f1f;font-size:10.5px;color:#3a3a3a}
+.shortcut-row:last-child{border:none}
+.shortcut-row .sa{display:flex;gap:3px}
+.kbd{background:#1e1e1e;border:1px solid #333;border-radius:3px;
+  padding:1px 5px;font-size:9px;color:#666;font-family:inherit}
+.spec-row{display:flex;align-items:center;gap:6px;padding:3px 0;
+  border-bottom:1px solid #1f1f1f;font-size:10px;color:#3a3a3a}
+.spec-row:last-child{border:none}
+.spec-dot{width:8px;height:8px;border-radius:1px;flex-shrink:0}
+.spec-row .sv2{margin-left:auto;color:#2e2e2e;font-size:9px}
+
+/* ══ BOTTOM TOOLBAR ══ */
+#toolbar{position:fixed;bottom:0;left:0;right:0;height:48px;
+  background:#111;border-top:1px solid #222;
+  display:flex;align-items:center;padding:0 8px;gap:4px;z-index:100}
+
+/* selected chip */
+#selchip{display:flex;align-items:center;gap:6px;height:30px;padding:0 9px;
+  min-width:96px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:5px;
+  font-size:11px;font-weight:600;color:#aaa;flex-shrink:0;transition:border-color .15s}
+#selchip:hover{border-color:#3a3a3a}
+.sdot{width:14px;height:14px;border-radius:3px;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.12);transition:background .2s}
+
+/* tool buttons */
+.tb{height:30px;min-width:30px;padding:0 9px;
+  background:#191919;border:1px solid #282828;border-radius:5px;
+  color:#666;font-size:11px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;
+  transition:all .1s;white-space:nowrap;font-family:inherit;letter-spacing:.1px}
+.tb:hover{background:#222;border-color:#3a3a3a;color:#bbb}
+.tb.on{background:#192030;border-color:#2e4a70;color:#6a9ee0}
+.tb.era:hover{background:#2a1208;border-color:#7a3010;color:#e07040}
+.tb.era.on{background:#2a1208;border-color:#b05030;color:#e08050}
+.tb.warn:hover{background:#2a1010;border-color:#6a2020;color:#e06060}
+.tb.active-tool{position:relative}
+.tb.active-tool::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+  width:14px;height:2px;border-radius:1px;background:currentColor;opacity:.5}
+
+/* separator */
+.tsep{width:1px;height:24px;background:#222;margin:0 2px;flex-shrink:0}
+
+/* brush shapes */
+#bshape{display:flex;gap:2px}
+.bsh{width:26px;height:26px;background:#191919;border:1px solid #282828;border-radius:4px;
+  font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:#484848;transition:all .1s}
+.bsh:hover{background:#222;color:#888;border-color:#383838}
+.bsh.on{background:#192030;border-color:#2e4a70;color:#6a9ee0}
+
+/* sliders */
+.sl-grp{display:flex;align-items:center;gap:5px}
+.sl-grp label{font-size:9px;color:#3a3a3a;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.sl-grp input[type=range]{width:62px;height:3px;border-radius:2px;
+  background:#282828;outline:none;-webkit-appearance:none;cursor:pointer}
+.sl-grp input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+  width:13px;height:13px;border-radius:50%;background:#777;cursor:pointer;
+  border:1.5px solid #111;box-shadow:0 1px 3px rgba(0,0,0,.6)}
+.sl-grp input[type=range]:hover::-webkit-slider-thumb{background:#bbb}
+.sl-lbl{font-size:10.5px;color:#888;min-width:26px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* speed */
+#sprow{display:flex;gap:2px}
+.spd{height:26px;min-width:28px;padding:0 5px;background:#171717;
+  border:1px solid #252525;border-radius:4px;font-size:10px;font-weight:700;
+  color:#404040;cursor:pointer;text-align:center;font-family:inherit;transition:all .1s}
+.spd:hover{background:#202020;color:#777;border-color:#333}
+.spd.on{background:#141e2c;border-color:#263850;color:#5a8ac8}
+
+/* stats */
+.stat{display:flex;align-items:center;gap:4px;padding:0 8px;height:22px;
+  background:#171717;border:1px solid #222;border-radius:11px;
+  font-size:10px;color:#404040;white-space:nowrap;flex-shrink:0}
+.stat b{color:#777;font-weight:600}
+
+.tsp{flex:1}
+.hint-txt{font-size:9px;color:#2a2a2a;white-space:nowrap;flex-shrink:0;letter-spacing:.1px}
+</style>
+</head>
+<body>
+
+<div id="cbox">
+  <canvas id="cv"></canvas>
+  <div id="pauseOverlay">PAUSA</div>
+  <div id="ring"></div>
+</div>
+
+<div id="panel">
+  <div id="tabs">
+    <div class="ptab on" onclick="switchTab('elements')" id="tab-elements"><span class="ti">⬡</span> Elem.</div>
+    <div class="ptab" onclick="switchTab('reactions')" id="tab-reactions"><span class="ti">⚗</span> Reac.</div>
+    <div class="ptab" onclick="switchTab('combos')" id="tab-combos"><span class="ti">⚡</span> Combos</div>
+    <div class="ptab" onclick="switchTab('info')" id="tab-info"><span class="ti">◈</span> Info</div>
+  </div>
+
+  <!-- ELEMENTS -->
+  <div class="tpage on" id="page-elements">
+    <!-- Current element info -->
+    <div id="elemPreview">
+      <div id="epSwatch"></div>
+      <div id="epInfo">
+        <div id="epName">Arena</div>
+        <div id="epType">polvo · básico</div>
+      </div>
+    </div>
+    <div id="searchbox">
+      <div id="searchWrap">
+        <span id="searchIcon">🔍</span>
+        <input id="searchInput" type="text" placeholder="Buscar elemento..." autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+    <div id="elist">
+      <div id="noRes"><span class="ni">🔎</span>Sin resultados</div>
+    </div>
+  </div>
+
+  <!-- REACTIONS -->
+  <div class="tpage" id="page-reactions">
+    <div id="reactionsPage">
+      <div class="rsec">Agua &amp; Temperatura</div>
+      <div class="rxn"><div class="rdot" style="background:#2080ff"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Agua + Lava</b>→ Piedra + Vapor</div><span class="rtag">clásico</span></div>
+      <div class="rxn"><div class="rdot" style="background:#99ccff"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Hielo + Lava</b>→ Obsidiana + Vapor</div></div>
+      <div class="rxn"><div class="rdot" style="background:#f0f0f0"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Sal + Agua</b>→ Se disuelve (tiñe)</div></div>
+      <div class="rxn"><div class="rdot" style="background:#f0c060"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Arena + Agua</b>→ Barro</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aaaaaa"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>P.Hormigón + Agua</b>→ Hormigón sólido</div></div>
+      <div class="rxn"><div class="rdot" style="background:#2080ff"></div><div class="rarr">+</div><div class="rdot" style="background:#ffff00"></div><div class="rdesc"><b>Agua + Electricidad</b>→ H₂ + O₂</div><span class="rtag">electrólisis</span></div>
+      <div class="rxn"><div class="rdot" style="background:#ddeeff"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Nieve + Fuego</b>→ Agua</div></div>
+      <div class="rsec">Fuego &amp; Combustión</div>
+      <div class="rxn"><div class="rdot" style="background:#ff5500"></div><div class="rarr">+</div><div class="rdot" style="background:#a05a2a"></div><div class="rdesc"><b>Fuego + Madera</b>→ Arde → Ceniza</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ff5500"></div><div class="rarr">+</div><div class="rdot" style="background:#4a3010"></div><div class="rdesc"><b>Fuego + Aceite</b>→ Fuego intenso</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ff5500"></div><div class="rarr">+</div><div class="rdot" style="background:#333322"></div><div class="rdesc"><b>Fuego + Pólvora</b>→ Explosión</div><span class="rtag">¡boom!</span></div>
+      <div class="rxn"><div class="rdot" style="background:#ff5500"></div><div class="rarr">+</div><div class="rdot" style="background:#99ee99"></div><div class="rdesc"><b>Fuego + Metano</b>→ Gran explosión</div><span class="rtag">¡boom!</span></div>
+      <div class="rxn"><div class="rdot" style="background:#ff4400"></div><div class="rarr">+</div><div class="rdot" style="background:#f0c060"></div><div class="rdesc"><b>Lava + Arena</b>→ Vidrio</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ff4400"></div><div class="rarr">+</div><div class="rdot" style="background:#c8a050"></div><div class="rdesc"><b>Lava + Arcilla</b>→ Ladrillo</div></div>
+      <div class="rxn"><div class="rdot" style="background:#f0e0a0"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Cera + Fuego</b>→ Arde y se consume</div></div>
+      <div class="rsec">Química</div>
+      <div class="rxn"><div class="rdot" style="background:#dddd00"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Azufre + Agua</b>→ Ácido</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aaff22"></div><div class="rarr">+</div><div class="rdot" style="background:#aaddff"></div><div class="rdesc"><b>Ácido + Vidrio</b>→ Arena</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aaff22"></div><div class="rarr">+</div><div class="rdot" style="background:#b8bcc0"></div><div class="rdesc"><b>Ácido + Metal</b>→ Humo tóxico</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ccee00"></div><div class="rarr">+</div><div class="rdot" style="background:#ffdd44"></div><div class="rdesc"><b>Cloro + Sodio</b>→ Sal</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffdddd"></div><div class="rarr">+</div><div class="rdot" style="background:#ddeeff"></div><div class="rdesc"><b>H₂ + O₂</b>→ Agua (con ignición)</div></div>
+      <div class="rxn"><div class="rdot" style="background:#f0f0f0"></div><div class="rarr">+</div><div class="rdot" style="background:#aaff22"></div><div class="rdesc"><b>Leche + Ácido</b>→ Piedra (cuaja)</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aaddff"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Alcohol + Fuego</b>→ Llama intensa</div><span class="rtag">flam.</span></div>
+      <div class="rxn"><div class="rdot" style="background:#111111"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Alquitrán + Fuego</b>→ Humo negro</div></div>
+      <div class="rsec">Biología</div>
+      <div class="rxn"><div class="rdot" style="background:#aa7733"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Semilla + Agua</b>→ Planta</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aa7733"></div><div class="rarr">+</div><div class="rdot" style="background:#5a3520"></div><div class="rdesc"><b>Semilla + Barro</b>→ Planta</div></div>
+      <div class="rxn"><div class="rdot" style="background:#cc88ff"></div><div class="rarr">+</div><div class="rdot" style="background:#7a4a2a"></div><div class="rdesc"><b>Hongo + Tierra</b>→ Se expande</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ff7777"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Coral + Agua</b>→ Crece lentamente</div></div>
+      <div class="rxn"><div class="rdot" style="background:#228833"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Alga + Agua</b>→ Crece</div></div>
+      <div class="rxn"><div class="rdot" style="background:#336622"></div><div class="rarr">+</div><div class="rdot" style="background:#888888"></div><div class="rdesc"><b>Musgo + Piedra</b>→ Crece</div></div>
+      <div class="rsec">Eléctrico</div>
+      <div class="rxn"><div class="rdot" style="background:#ffff00"></div><div class="rarr">+</div><div class="rdot" style="background:#b8bcc0"></div><div class="rdesc"><b>Electricidad + Metal</b>→ Se propaga</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffff00"></div><div class="rarr">+</div><div class="rdot" style="background:#aaaa55"></div><div class="rdesc"><b>Electricidad + Bombilla</b>→ Se ilumina</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffff00"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Electricidad + Neón</b>→ Plasma naranja</div></div>
+      <div class="rxn"><div class="rdot" style="background:#44aa44"></div><div class="rarr">→</div><div class="rdot" style="background:#ffff00"></div><div class="rdesc"><b>Batería</b>→ Emite electricidad</div><span class="rtag">auto</span></div>
+      <div class="rsec">Nuclear &amp; Astro</div>
+      <div class="rxn"><div class="rdot" style="background:#00ee00"></div><div class="rarr">+</div><div class="rdot" style="background:#00ffff"></div><div class="rdesc"><b>Uranio + Neutrón</b>→ Fisión nuclear</div><span class="rtag">¡BOOM!</span></div>
+      <div class="rxn"><div class="rdot" style="background:#ffdd44"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Sodio + Agua</b>→ Explosión + H₂</div><span class="rtag">¡boom!</span></div>
+      <div class="rxn"><div class="rdot" style="background:#220033"></div><div class="rarr">+</div><div class="rdot" style="background:#050505"></div><div class="rdesc"><b>Mat.Oscura + Vacío</b>→ Megaexplosión</div><span class="rtag">extremo</span></div>
+      <div class="rxn"><div class="rdot" style="background:#333333"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Carbono + Lava</b>→ Diamante (muy raro)</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffaaff"></div><div class="rarr">+</div><div class="rdot" style="background:#ccffff"></div><div class="rdesc"><b>Polvo★ + Diamante</b>→ Explosión de plasma</div></div>
+      <div style="height:12px"></div>
+    </div>
+  </div>
+
+  <!-- COMBOS -->
+  <div class="tpage" id="page-combos">
+    <div id="reactionsPage" style="overflow-y:auto;flex:1">
+      <div class="rsec">🏗 Construcción</div>
+      <div class="rxn"><div class="rdot" style="background:#f0c060"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Arena + Lava</b> → Vidrio</div><span class="rtag">básico</span></div>
+      <div class="rxn"><div class="rdot" style="background:#c8a050"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Arcilla + Fuego</b> → Ladrillo</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aaaaaa"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>P.Hormigón + Agua</b> → Hormigón sólido</div></div>
+      <div class="rxn"><div class="rdot" style="background:#333333"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Carbono + Lava</b> → 💎 Diamante (raro)</div><span class="rtag">raro</span></div>
+      <div class="rxn"><div class="rdot" style="background:#99ccff"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Hielo + Lava</b> → Obsidiana + Vapor</div></div>
+      <div class="rsec">⚗ Química</div>
+      <div class="rxn"><div class="rdot" style="background:#dddd00"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Azufre + Agua</b> → Ácido</div></div>
+      <div class="rxn"><div class="rdot" style="background:#f0c060"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Arena + Agua</b> → Barro</div></div>
+      <div class="rxn"><div class="rdot" style="background:#f0f0f0"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Sal + Agua</b> → Agua salada (azul)</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffffaa"></div><div class="rarr">+</div><div class="rdot" style="background:#f0f0f0"></div><div class="rdesc"><b>Vinagre + Leche</b> → Piedra (cuaja)</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffdddd"></div><div class="rarr">+</div><div class="rdot" style="background:#ddeeff"></div><div class="rdesc"><b>H₂ + O₂ + Fuego</b> → Explosión + Agua</div><span class="rtag">¡boom!</span></div>
+      <div class="rxn"><div class="rdot" style="background:#ccee00"></div><div class="rarr">+</div><div class="rdot" style="background:#ffdd44"></div><div class="rdesc"><b>Cloro + Sodio</b> → Sal</div></div>
+      <div class="rsec">🔥 Combustión</div>
+      <div class="rxn"><div class="rdot" style="background:#a05a2a"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Madera + Fuego</b> → Arde → Ceniza</div></div>
+      <div class="rxn"><div class="rdot" style="background:#222222"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Carbón + Fuego</b> → Arde → Ceniza</div></div>
+      <div class="rxn"><div class="rdot" style="background:#f0e0a0"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Cera + Fuego</b> → Arde suavemente</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aaddff"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Alcohol + Fuego</b> → Llama intensa</div></div>
+      <div class="rxn"><div class="rdot" style="background:#111111"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Alquitrán + Fuego</b> → Humo negro tóxico</div></div>
+      <div class="rxn"><div class="rdot" style="background:#333322"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Pólvora + Fuego</b> → Explosión</div><span class="rtag">¡boom!</span></div>
+      <div class="rxn"><div class="rdot" style="background:#99ee99"></div><div class="rarr">+</div><div class="rdot" style="background:#ff5500"></div><div class="rdesc"><b>Metano + Fuego</b> → Gran explosión</div><span class="rtag">¡BOOM!</span></div>
+      <div class="rsec">⚡ Electricidad</div>
+      <div class="rxn"><div class="rdot" style="background:#ffff00"></div><div class="rarr">+</div><div class="rdot" style="background:#b8bcc0"></div><div class="rdesc"><b>Electr. + Metal/Cobre/Oro</b> → Se propaga</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffff00"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Electr. + Agua</b> → H₂ + O₂ (electrólisis)</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffff00"></div><div class="rarr">+</div><div class="rdot" style="background:#ff4400"></div><div class="rdesc"><b>Electr. + Neón</b> → Plasma rojo-naranja</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ffff00"></div><div class="rarr">+</div><div class="rdot" style="background:#4a3010"></div><div class="rdesc"><b>Electr. + Aceite</b> → Fuego</div></div>
+      <div class="rsec">🌱 Biología</div>
+      <div class="rxn"><div class="rdot" style="background:#aa7733"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Semilla + Agua</b> → Planta</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aa7733"></div><div class="rarr">+</div><div class="rdot" style="background:#5a3520"></div><div class="rdesc"><b>Semilla + Barro</b> → Planta</div></div>
+      <div class="rxn"><div class="rdot" style="background:#cc88ff"></div><div class="rarr">+</div><div class="rdot" style="background:#7a4a2a"></div><div class="rdesc"><b>Hongo + Tierra/Madera</b> → Se expande</div></div>
+      <div class="rxn"><div class="rdot" style="background:#336622"></div><div class="rarr">+</div><div class="rdot" style="background:#888888"></div><div class="rdesc"><b>Musgo + Piedra</b> → Crece sobre ella</div></div>
+      <div class="rxn"><div class="rdot" style="background:#ff7777"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Coral + Agua (salada)</b> → Crece rápido</div></div>
+      <div class="rxn"><div class="rdot" style="background:#aa77cc"></div><div class="rarr">+</div><div class="rdot" style="background:#7a4a2a"></div><div class="rdesc"><b>Micelio + Tierra</b> → Espora + se expande</div></div>
+      <div class="rsec">☢ Nuclear &amp; Astro</div>
+      <div class="rxn"><div class="rdot" style="background:#00ee00"></div><div class="rarr">+</div><div class="rdot" style="background:#00ffff"></div><div class="rdesc"><b>Uranio + Neutrón</b> → Fisión nuclear</div><span class="rtag">extremo</span></div>
+      <div class="rxn"><div class="rdot" style="background:#ffdd44"></div><div class="rarr">+</div><div class="rdot" style="background:#2080ff"></div><div class="rdesc"><b>Sodio + Agua</b> → Explosión + H₂</div><span class="rtag">¡boom!</span></div>
+      <div class="rxn"><div class="rdot" style="background:#220033"></div><div class="rarr">+</div><div class="rdot" style="background:#050505"></div><div class="rdesc"><b>Mat.Oscura + Vacío</b> → Megaexplosión</div><span class="rtag">extremo</span></div>
+      <div class="rxn"><div class="rdot" style="background:#ffaaff"></div><div class="rarr">+</div><div class="rdot" style="background:#ccffff"></div><div class="rdesc"><b>Polvo★ + Diamante</b> → Explosión de plasma</div></div>
+      <div class="rxn"><div class="rdot" style="background:#8833ff"></div><div class="rarr">+</div><div class="rdot" style="background:#ffaaff"></div><div class="rdesc"><b>Nebulosa + Polvo★</b> → Plasma explosivo</div></div>
+      <div style="height:12px"></div>
+    </div>
+  </div>
+
+  <!-- INFO -->
+  <div class="tpage" id="page-info">
+    <div id="infoPage">
+      <div class="icard">
+        <h4>Estadísticas</h4>
+        <div class="irow"><span class="il">Partículas</span><span class="iv" id="iPart">0</span></div>
+        <div class="irow"><span class="il">FPS</span><span class="iv" id="iFps">60</span></div>
+        <div class="irow"><span class="il">Fotograma</span><span class="iv" id="iFrame">0</span></div>
+        <div class="irow"><span class="il">Grid</span><span class="iv" id="iGrid">–</span></div>
+        <div class="irow"><span class="il">Vel. simulación</span><span class="iv" id="iSpeed">1×</span></div>
+      </div>
+      <div class="icard">
+        <h4>Temperatura Global</h4>
+        <div class="irow"><span class="il">Estado</span><span class="iv" id="iHeat">❄ Frío</span></div>
+        <div class="hbar"><div class="hfill" id="heatFill"></div></div>
+        <div class="hscale"><span>❄</span><span>🌡</span><span>🔥</span><span>💀</span></div>
+      </div>
+      <div class="icard">
+        <h4>Atajos de Teclado</h4>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">Espacio</span></div><span>Pausar</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">C</span></div><span>Limpiar todo</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">E</span></div><span>Borrador</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">R</span></div><span>Modo reemplazar</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">Scroll ↕</span></div><span>Tamaño pincel</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">[</span><span class="kbd">]</span></div><span>Pincel ±1</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">1</span><span>–</span><span class="kbd">5</span></div><span>Velocidad</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">Clic ▶</span></div><span>Pintar</span></div>
+        <div class="shortcut-row"><div class="sa"><span class="kbd">Clic ▷</span></div><span>Borrar rápido</span></div>
+      </div>
+      <div class="icard">
+        <h4>Elementos Especiales</h4>
+        <div class="spec-row"><div class="spec-dot" style="background:#336688"></div>Condensador<span class="sv2">vapor→agua</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#cc2200"></div>PiedraFuego<span class="sv2">agua→vapor</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#99ddff"></div>Cryo<span class="sv2">enfría&amp;congela</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#cc9933"></div>Esponja<span class="sv2">absorbe líq.</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#3a3a3a"></div>Goma<span class="sv2">aísla elec.</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#cc3333"></div>Imán<span class="sv2">atrae metales</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#ccffff"></div>Diamante<span class="sv2">indestructible</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#8800ff"></div>Portal<span class="sv2">teleporta</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#ff6600"></div>Cosechadora<span class="sv2">borra al moverse</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#aa44ff"></div>Clonador<span class="sv2">copia partículas</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#4488cc"></div>Bomba de agua<span class="sv2">mueve líq.arriba</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#448888"></div>Filtro<span class="sv2">elimina tóxicos</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#ff7700"></div>Antorcha<span class="sv2">emite fuego</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#44aa44"></div>Batería<span class="sv2">emite electricidad</span></div>
+        <div class="spec-row"><div class="spec-dot" style="background:#110022"></div>Aguj.Negro<span class="sv2">atrae todo</span></div>
+      </div>
+      <div style="height:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM TOOLBAR -->
+<div id="toolbar">
+  <div id="selchip">
+    <div class="sdot" id="selDot" style="background:#f0c060"></div>
+    <span id="selName">Arena</span>
+  </div>
+  <div class="tsep"></div>
+  <button class="tb era" id="eraseBtn" onclick="toggleErase()" title="[E] Borrar">✕ Borrar</button>
+  <button class="tb" id="replaceBtn" onclick="toggleReplace()" title="[R] Reemplazar">⇄ Reemplazar</button>
+  <div class="tsep"></div>
+  <div id="bshape">
+    <div class="bsh on" id="bsh-circle" onclick="setBrushShape('circle')" title="Círculo">●</div>
+    <div class="bsh" id="bsh-square" onclick="setBrushShape('square')" title="Cuadrado">■</div>
+    <div class="bsh" id="bsh-spray" onclick="setBrushShape('spray')" title="Spray">✦</div>
+    <div class="bsh" id="bsh-line" onclick="setBrushShape('line')" title="Línea">━</div>
+  </div>
+  <div class="tsep"></div>
+  <div class="sl-grp">
+    <label>Tamaño</label>
+    <input type="range" id="szRange" min="1" max="30" value="6">
+    <span class="sl-lbl" id="szVal">6</span>
+  </div>
+  <div class="sl-grp">
+    <label>Densidad</label>
+    <input type="range" id="dnRange" min="1" max="10" value="10">
+    <span class="sl-lbl" id="dnVal">100%</span>
+  </div>
+  <div class="tsep"></div>
+  <div id="sprow">
+    <button class="spd" data-s="0.25" title="[1]">¼×</button>
+    <button class="spd" data-s="0.5" title="[2]">½×</button>
+    <button class="spd on" data-s="1" title="[3]">1×</button>
+    <button class="spd" data-s="2" title="[4]">2×</button>
+    <button class="spd" data-s="4" title="[5]">4×</button>
+  </div>
+  <div class="tsep"></div>
+  <button class="tb" id="pauseBtn" onclick="togglePause()" title="[Espacio]">⏸ Pausa</button>
+  <button class="tb warn" onclick="clearAll()" title="[C] Limpiar">🗑</button>
+  <button class="tb" onclick="saveImg()" title="Guardar PNG">💾</button>
+  <div class="tsep"></div>
+  <div class="stat">Part. <b id="sPart">0</b></div>
+  <div class="stat">FPS <b id="sFps">60</b></div>
+  <div class="stat" id="heatStat">❄ Frío</div>
+  <div class="tsp"></div>
+  <span class="hint-txt">▶clic pintar · ▷clic borrar · scroll: tamaño</span>
+</div>
+
+<script>
+// ══ CANVAS ══════════════════════════════════════════════════════════════════
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const PS=3;
+let CW,CH,W,H;
+function resizeCanvas(){
+  const b=document.getElementById('cbox');
+  CW=Math.floor(b.clientWidth/PS)*PS;
+  CH=Math.floor(b.clientHeight/PS)*PS;
+  cv.width=CW;cv.height=CH;
+  W=CW/PS|0;H=CH/PS|0;
+  grid=makeGrid();
+  imgData=ctx.createImageData(CW,CH);
+  buf=new Uint8ClampedArray(imgData.data.length);
+  document.getElementById('iGrid').textContent=`${W}×${H}`;
+}
+function makeGrid(){return Array.from({length:H},()=>new Array(W).fill(null));}
+
+// ══ MATERIALS ═══════════════════════════════════════════════════════════════
+const SECTIONS=[
+  ['Básicos',[
+    ['sand',     'Arena',        '#f0c060','powder'],
+    ['water',    'Agua',         '#2080ff','liquid'],
+    ['stone',    'Piedra',       '#888888','solid'],
+    ['dirt',     'Tierra',       '#7a4a2a','powder'],
+    ['mud',      'Barro',        '#5a3520','powder'],
+    ['gravel',   'Grava',        '#888070','powder'],
+    ['clay',     'Arcilla',      '#c8a050','powder'],
+    ['salt',     'Sal',          '#f0f0f0','powder'],
+    ['snow',     'Nieve',        '#ddeeff','powder'],
+    ['ash',      'Ceniza',       '#909090','powder'],
+    ['concrete_powder','P.Horm.','#aaaaaa','powder'],
+    ['concrete', 'Hormigón',     '#808080','solid'],
+  ]],
+  ['Construcción',[
+    ['glass',    'Vidrio',       '#aaddff','solid'],
+    ['glass2',   'Vidrio★',      '#88ffee','solid'],
+    ['brick',    'Ladrillo',     '#cc4422','solid'],
+    ['wood',     'Madera',       '#a05a2a','solid',{flam:1}],
+    ['metal',    'Metal',        '#b8bcc0','solid',{cond:1}],
+    ['copper',   'Cobre',        '#cc7722','solid',{cond:1}],
+    ['gold',     'Oro',          '#ffcc00','solid',{cond:1}],
+    ['silver',   'Plata',        '#dddddd','solid',{cond:1}],
+    ['obsidian', 'Obsidiana',    '#1a0a28','solid'],
+    ['ice',      'Hielo',        '#99ccff','solid'],
+    ['rubber',   'Goma',         '#3a3a3a','solid',{ins:1}],
+    ['diamond',  'Diamante',     '#ccffff','solid',{indes:1}],
+    ['glass3',   'Vidrio Negro', '#223344','solid',{NEW:1}],
+    ['ceramic',  'Cerámica',     '#ddbb99','solid',{NEW:1}],
+  ]],
+  ['Fuego & Calor',[
+    ['fire',     'Fuego',        '#ff5500','gas',{life:70}],
+    ['lava',     'Lava',         '#ff4400','liquid',{hot:1}],
+    ['lava2',    'Lava Azul',    '#2244ff','liquid',{hot:1,NEW:1}],
+    ['magma',    'Magma',        '#ff6600','liquid',{hot:1}],
+    ['plasma',   'Plasma',       '#cc44ff','gas',{life:60,hot:1}],
+    ['coal',     'Carbón',       '#222222','solid',{flam:1}],
+    ['oil',      'Aceite',       '#4a3010','liquid',{flam:1}],
+    ['petroleum','Petróleo',     '#1a1a1a','liquid',{flam:1}],
+    ['gunpowder','Pólvora',      '#333322','powder',{expl:1}],
+    ['wax',      'Cera',         '#f0e0a0','solid',{flam:1}],
+    ['torch',    'Antorcha',     '#ff7700','special'],
+    ['ember',    'Brasa',        '#ff3300','solid',{hot:1,NEW:1}],
+  ]],
+  ['Gases',[
+    ['steam',    'Vapor',        '#cccccc','gas',{life:140}],
+    ['smoke',    'Humo',         '#555555','gas',{life:200}],
+    ['oxygen',   'Oxígeno',      '#ddeeff','gas',{life:300}],
+    ['hydrogen', 'Hidrógeno',    '#ffdddd','gas',{life:240,expl:1}],
+    ['methane',  'Metano',       '#99ee99','gas',{life:220,expl:1}],
+    ['neon',     'Neón',         '#ff4400','gas',{life:400}],
+    ['helium',   'Helio',        '#ffddcc','gas',{life:500}],
+    ['co2',      'CO₂',          '#aabbaa','gas',{life:250}],
+    ['chlorine', 'Cloro',        '#ccee00','gas',{life:200,toxic:1}],
+    ['nitrogen', 'Nitrógeno',    '#bbccee','gas',{life:350}],
+    ['ammonia',  'Amoníaco',     '#ddfff8','gas',{life:200}],
+    ['argon',    'Argón',        '#ccaaff','gas',{life:600,NEW:1}],
+  ]],
+  ['Química',[
+    ['acid',     'Ácido',        '#aaff22','liquid'],
+    ['slime',    'Slime',        '#44ee88','liquid'],
+    ['glue',     'Pegamento',    '#ffcc88','liquid'],
+    ['honey',    'Miel',         '#ffaa00','liquid'],
+    ['soap',     'Jabón',        '#eeddff','liquid'],
+    ['blood',    'Sangre',       '#aa1122','liquid'],
+    ['mercury',  'Mercurio',     '#cccccc','liquid',{toxic:1}],
+    ['rust',     'Óxido',        '#994433','powder'],
+    ['sulfur',   'Azufre',       '#dddd00','powder',{flam:1}],
+    ['carbon',   'Carbono',      '#333333','powder'],
+    ['phosphorus','Fósforo',     '#ffffcc','solid',{flam:1}],
+    ['vinegar',  'Vinagre',      '#ffffaa','liquid',{NEW:1}],
+    ['resin',    'Resina',       '#aa6622','liquid',{NEW:1}],
+  ]],
+  ['Eléctrico',[
+    ['electricity','Electr.',    '#ffff00','energy',{life:14}],
+    ['wire',     'Cable',        '#cc8800','solid',{cond:1}],
+    ['copper',   'Cobre',        '#cc7722','solid',{cond:1}],
+    ['bulb',     'Bombilla',     '#aaaa55','solid'],
+    ['magnet',   'Imán',         '#cc3333','solid'],
+    ['door',     'Puerta',       '#774422','solid'],
+    ['battery',  'Batería',      '#44aa44','special'],
+    ['resistor', 'Resistencia',  '#884422','solid'],
+    ['capacitor','Condensad.E',  '#aa6622','solid',{NEW:1}],
+  ]],
+  ['Herramientas',[
+    ['condenser','Condensad.',   '#336688','solid'],
+    ['firestone','PiedraFuego',  '#cc2200','solid',{hot:1}],
+    ['cryo',     'Cryo',         '#99ddff','solid',{cold:1}],
+    ['sponge',   'Esponja',      '#cc9933','solid'],
+    ['harvester','Cosechadora',  '#ff6600','special'],
+    ['filter',   'Filtro',       '#448888','solid'],
+    ['cloner',   'Clonador',     '#aa44ff','special'],
+    ['pump',     'Bomba de Agua','#4488cc','special'],
+    ['fan',      'Ventilador',   '#8899aa','special',{NEW:1}],
+    ['heater',   'Calentador',   '#cc4400','solid',{hot:1,NEW:1}],
+    ['cooler',   'Enfriador',    '#4466cc','solid',{cold:1,NEW:1}],
+  ]],
+  ['Explosivos',[
+    ['explosive','C4',           '#ffee22','solid'],
+    ['tnt',      'TNT',          '#ff2222','solid'],
+    ['neutron',  'Neutrón',      '#00ffff','energy',{life:55}],
+    ['fireworks','Fuegos★',      '#ff88dd','powder'],
+    ['sodium',   'Sodio',        '#ffdd44','solid',{react:1}],
+    ['uranium',  'Uranio',       '#00ee00','solid'],
+    ['bomb',     'Bomba',        '#ff4444','solid'],
+    ['grenade',  'Granada',      '#556633','solid',{NEW:1}],
+    ['mine',     'Mina',         '#776633','solid',{NEW:1}],
+  ]],
+  ['Biología',[
+    ['plant',    'Planta',       '#33cc33','solid'],
+    ['seed',     'Semilla',      '#aa7733','powder'],
+    ['fungus',   'Hongo',        '#cc88ff','solid'],
+    ['coral',    'Coral',        '#ff7777','solid'],
+    ['algae',    'Alga',         '#228833','solid'],
+    ['moss',     'Musgo',        '#336622','solid'],
+    ['cactus',   'Cactus',       '#449933','solid'],
+    ['mycelium', 'Micelio',      '#aa77cc','powder',{NEW:1}],
+    ['spore',    'Espora',       '#ddaaff','powder',{NEW:1}],
+  ]],
+  ['Astro',[
+    ['void',     'Vacío',        '#050505','special'],
+    ['stardust', 'Polvo★',       '#ffaaff','powder'],
+    ['darkMatter','Mat.Oscura',  '#220033','solid'],
+    ['antimatter','Antimat.',    '#ff00ff','special'],
+    ['blackhole','Aguj.Negro',   '#110022','special'],
+    ['comet',    'Cometa',       '#88ccff','powder'],
+    ['nebula',   'Nebulosa',     '#8833ff','gas',{life:500,NEW:1}],
+    ['neutronStar','Est.Neutr.', '#aaffff','solid',{NEW:1}],
+  ]],
+  ['Líquidos+',[
+    ['quicksand','A.Movediza',   '#cc9944','liquid'],
+    ['milk',     'Leche',        '#f0f0f0','liquid'],
+    ['lemonade', 'Limonada',     '#eeff44','liquid'],
+    ['ink',      'Tinta',        '#1122aa','liquid'],
+    ['alcohol',  'Alcohol',      '#aaddff','liquid',{flam:1}],
+    ['poison',   'Veneno',       '#88ff44','liquid',{toxic:1}],
+    ['tar',      'Alquitrán',    '#111111','liquid'],
+    ['lava3',    'Lava Verde',   '#33ff44','liquid',{hot:1,NEW:1}],
+    ['oil2',     'Aceite Denso', '#665522','liquid',{flam:1,NEW:1}],
+  ]],
+  ['Nuevo 🆕',[
+    ['crystal',   'Cristal',      '#aaffee','solid',{NEW:1}],
+    ['lava_rock', 'Roca Lava',    '#553322','solid',{NEW:1}],
+    ['bubble',    'Burbuja',      '#ddeeff','gas',{life:60,NEW:1}],
+    ['acid_gas',  'Gas Ácido',    '#88ff44','gas',{life:120,toxic:1,NEW:1}],
+    ['magma_rock','Roca Magma',   '#774422','powder',{hot:1,NEW:1}],
+    ['saltwater', 'Agua Salada',  '#88aaff','liquid',{NEW:1}],
+    ['steam_hot', 'Vapor Caliente','#ffddbb','gas',{life:80,hot:1,NEW:1}],
+    ['foam',      'Espuma',       '#eeeeff','gas',{life:100,NEW:1}],
+    ['amber',     'Ámbar',        '#dd8800','solid',{NEW:1}],
+    ['gel',       'Gel',          '#88ffcc','liquid',{NEW:1}],
+    ['spark',     'Chispa',       '#ffff44','gas',{life:8,NEW:1}],
+    ['obsidian2', 'Obsid. Roja',  '#330011','solid',{NEW:1}],
+  ]],
+];
+
+const M={};
+SECTIONS.forEach(([,els])=>els.forEach(([key,name,col,type,extra={}])=>{
+  M[key]={n:name,c:col,t:type,...extra};
+}));
+// extra physics defs
+M.wire={n:'Cable',c:'#cc8800',t:'solid',cond:1};
+M.glass3={n:'Vidrio Negro',c:'#223344',t:'solid'};
+M.ceramic={n:'Cerámica',c:'#ddbb99',t:'solid'};
+M.ember={n:'Brasa',c:'#ff3300',t:'solid',hot:1};
+M.argon={n:'Argón',c:'#ccaaff',t:'gas',life:600};
+M.vinegar={n:'Vinagre',c:'#ffffaa',t:'liquid'};
+M.resin={n:'Resina',c:'#aa6622',t:'liquid'};
+M.capacitor={n:'Condensad.E',c:'#aa6622',t:'solid'};
+M.fan={n:'Ventilador',c:'#8899aa',t:'special'};
+M.heater={n:'Calentador',c:'#cc4400',t:'solid',hot:1};
+M.cooler={n:'Enfriador',c:'#4466cc',t:'solid',cold:1};
+M.grenade={n:'Granada',c:'#556633',t:'solid'};
+M.mine={n:'Mina',c:'#776633',t:'solid'};
+M.mycelium={n:'Micelio',c:'#aa77cc',t:'powder'};
+M.spore={n:'Espora',c:'#ddaaff',t:'powder'};
+M.nebula={n:'Nebulosa',c:'#8833ff',t:'gas',life:500};
+M.neutronStar={n:'Est.Neutr.',c:'#aaffff',t:'solid'};
+M.lava3={n:'Lava Verde',c:'#33ff44',t:'liquid',hot:1};
+M.oil2={n:'Aceite Denso',c:'#665522',t:'liquid',flam:1};
+M.petroleum={n:'Petróleo',c:'#1a1a1a',t:'liquid',flam:1};
+M.torch={n:'Antorcha',c:'#ff7700',t:'special'};
+M.wax={n:'Cera',c:'#f0e0a0',t:'solid',flam:1};
+M.bomb={n:'Bomba',c:'#ff4444',t:'solid'};
+M.resistor={n:'Resistencia',c:'#884422',t:'solid'};
+M.battery={n:'Batería',c:'#44aa44',t:'special'};
+M.filter={n:'Filtro',c:'#448888',t:'solid'};
+M.cloner={n:'Clonador',c:'#aa44ff',t:'special'};
+M.pump={n:'Bomba de Agua',c:'#4488cc',t:'special'};
+M.moss={n:'Musgo',c:'#336622',t:'solid'};
+M.cactus={n:'Cactus',c:'#449933',t:'solid'};
+M.milk={n:'Leche',c:'#f0f0f0',t:'liquid'};
+M.lemonade={n:'Limonada',c:'#eeff44',t:'liquid'};
+M.ink={n:'Tinta',c:'#1122aa',t:'liquid'};
+M.alcohol={n:'Alcohol',c:'#aaddff',t:'liquid',flam:1};
+M.poison={n:'Veneno',c:'#88ff44',t:'liquid',toxic:1};
+M.tar={n:'Alquitrán',c:'#111111',t:'liquid'};
+M.blackhole={n:'Aguj.Negro',c:'#110022',t:'special'};
+M.comet={n:'Cometa',c:'#88ccff',t:'powder'};
+
+// category accent colors
+const CAT_COLORS={'Básicos':'#5a7a5a','Construcción':'#5a6a8a','Fuego & Calor':'#8a4a2a',
+  'Gases':'#4a7a8a','Química':'#6a8a3a','Eléctrico':'#8a7a2a','Herramientas':'#4a6a8a',
+  'Explosivos':'#8a3a2a','Biología':'#3a7a4a','Astro':'#5a3a8a','Líquidos+':'#3a5a8a',
+  'Nuevo 🆕':'#6a4a8a'};
+
+// ══ STATE ═══════════════════════════════════════════════════════════════════
+let grid=[],imgData,buf;
+let sel='sand',brushSz=6,brushDen=10,brushShape='circle';
+let drawing=false,activeBtn=-1;
+let paused=false,simSpeed=1;
+let frame=0,acc=0,lastT=0;
+let globalHeat=0;
+let fpsArr=[],lastFpsT=0;
+let eraseMode=false,replaceMode=false;
+const ALL_ELEMS=[];
+
+// ══ TABS ════════════════════════════════════════════════════════════════════
+function switchTab(name){
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tpage').forEach(p=>p.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+  document.getElementById('page-'+name).classList.add('on');
+}
+
+// ══ PICKER ══════════════════════════════════════════════════════════════════
+function buildPicker(){
+  const list=document.getElementById('elist');
+  const typeMap={powder:'polvo',liquid:'líq.',solid:'sólido',gas:'gas',energy:'energ.',special:'espec.'};
+
+  SECTIONS.forEach(([sname,els])=>{
+    const cc=CAT_COLORS[sname]||'#4a6a8a';
+    const hdr=document.createElement('div');
+    hdr.className='chdr open';
+    hdr.style.setProperty('--cc',cc);
+    hdr.innerHTML=`${sname}<span class="ccount">${els.length}</span><span class="ch">▲</span>`;
+    list.appendChild(hdr);
+
+    const body=document.createElement('div');
+    body.className='cbody';
+    els.forEach(([key,name,col,type,extra={}])=>{
+      const el=document.createElement('div');
+      el.className='elem'+(key===sel?' on':'');
+      el.dataset.key=key;el.dataset.name=name.toLowerCase();
+      el.style.setProperty('--ec',col);
+      const newBadge=extra.NEW?'<span class="enew">NUEVO</span>':'';
+      el.innerHTML=`<div class="eswatch" style="background:${col}"></div>${name}${newBadge}<span class="etag">${typeMap[type]||type}</span>`;
+      el.onclick=()=>pickMat(key);
+      body.appendChild(el);
+      ALL_ELEMS.push(el);
+    });
+    list.appendChild(body);
+
+    hdr.onclick=()=>{
+      const open=hdr.classList.toggle('open');
+      body.classList.toggle('closed',!open);
+    };
+  });
+
+  document.getElementById('searchInput').addEventListener('input',function(){
+    const q=this.value.trim().toLowerCase();
+    let found=0;
+    ALL_ELEMS.forEach(el=>{
+      const match=!q||el.dataset.name.includes(q)||el.dataset.key.includes(q);
+      el.style.display=match?'':'none';
+      if(match)found++;
+    });
+    document.querySelectorAll('.chdr').forEach(hdr=>{
+      if(!q){hdr.style.display='';return;}
+      const body=hdr.nextElementSibling;
+      const vis=[...body.querySelectorAll('.elem')].some(e=>e.style.display!=='none');
+      hdr.style.display=vis?'':'none';
+      if(vis)body.classList.remove('closed');
+    });
+    document.getElementById('noRes').style.display=found===0?'block':'none';
+  });
+}
+
+function pickMat(key){
+  sel=key;eraseMode=false;replaceMode=false;
+  document.getElementById('eraseBtn').classList.remove('on','era');
+  document.getElementById('eraseBtn').classList.add('era');
+  document.getElementById('replaceBtn').classList.remove('on');
+  document.querySelectorAll('.elem').forEach(e=>e.classList.toggle('on',e.dataset.key===key));
+  const mat=M[key];
+  const name=mat?.n||key;
+  const col=mat?.c||'#888';
+  const typeMap={powder:'polvo',liquid:'líquido',solid:'sólido',gas:'gas',energy:'energía',special:'especial'};
+  const typeLabel=typeMap[mat?.t]||mat?.t||'';
+  document.getElementById('selName').textContent=name;
+  document.getElementById('selDot').style.background=col;
+  // update preview card
+  document.getElementById('epSwatch').style.background=col;
+  document.getElementById('epName').textContent=name;
+  document.getElementById('epType').textContent=typeLabel+(mat?.flam?' · inflamable':mat?.hot?' · caliente':mat?.cold?' · frío':mat?.expl?' · explosivo':mat?.toxic?' · tóxico':mat?.cond?' · conductor':mat?.indes?' · indestructible':mat?.NEW?' · nuevo':'');
+  switchTab('elements');
+}
+function toggleErase(){
+  eraseMode=!eraseMode;replaceMode=false;
+  document.getElementById('eraseBtn').classList.toggle('on',eraseMode);
+  document.getElementById('replaceBtn').classList.remove('on');
+  if(eraseMode)document.querySelectorAll('.elem').forEach(e=>e.classList.remove('on'));
+}
+function toggleReplace(){
+  replaceMode=!replaceMode;eraseMode=false;
+  document.getElementById('replaceBtn').classList.toggle('on',replaceMode);
+  document.getElementById('eraseBtn').classList.remove('on');
+}
+function setBrushShape(s){
+  brushShape=s;
+  document.querySelectorAll('.bsh').forEach(b=>b.classList.remove('on'));
+  document.getElementById('bsh-'+s).classList.add('on');
+}
+
+// ══ CONTROLS ════════════════════════════════════════════════════════════════
+document.getElementById('szRange').oninput=e=>{brushSz=+e.target.value;document.getElementById('szVal').textContent=brushSz;};
+document.getElementById('dnRange').oninput=e=>{brushDen=+e.target.value;document.getElementById('dnVal').textContent=Math.round(brushDen*10)+'%';};
+document.querySelectorAll('.spd').forEach(b=>{
+  b.onclick=()=>{
+    simSpeed=parseFloat(b.dataset.s);acc=0;
+    document.querySelectorAll('.spd').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById('iSpeed').textContent=b.textContent;
+  };
+});
+
+// ══ INPUT ════════════════════════════════════════════════════════════════════
+const ring=document.getElementById('ring');
+let lastPX=-1,lastPY=-1;
+
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('mousedown',e=>{e.preventDefault();drawing=true;activeBtn=e.button;lastPX=-1;lastPY=-1;paint(e);});
+cv.addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect();
+  const rx=e.clientX-r.left,ry=e.clientY-r.top;
+  const sz=brushSz*PS*2+2;
+  const br=brushShape==='square'?'2px':'50%';
+  ring.style.cssText=`display:block;left:${rx}px;top:${ry}px;width:${sz}px;height:${sz}px;border-radius:${br}`;
+  if(drawing)paint(e);
+});
+cv.addEventListener('mouseleave',()=>{drawing=false;activeBtn=-1;ring.style.display='none';});
+cv.addEventListener('mouseup',()=>{drawing=false;activeBtn=-1;});
+cv.addEventListener('wheel',e=>{
+  e.preventDefault();
+  brushSz=Math.max(1,Math.min(30,brushSz-(e.deltaY>0?1:-1)));
+  document.getElementById('szRange').value=brushSz;
+  document.getElementById('szVal').textContent=brushSz;
+},{passive:false});
+
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.code==='Space'){e.preventDefault();togglePause();}
+  if(e.code==='KeyC')clearAll();
+  if(e.code==='KeyE')toggleErase();
+  if(e.code==='KeyR')toggleReplace();
+  if(e.code==='BracketRight'){brushSz=Math.min(30,brushSz+1);document.getElementById('szRange').value=brushSz;document.getElementById('szVal').textContent=brushSz;}
+  if(e.code==='BracketLeft'){brushSz=Math.max(1,brushSz-1);document.getElementById('szRange').value=brushSz;document.getElementById('szVal').textContent=brushSz;}
+  if(e.code==='Digit1')document.querySelector('[data-s="0.25"]').click();
+  if(e.code==='Digit2')document.querySelector('[data-s="0.5"]').click();
+  if(e.code==='Digit3')document.querySelector('[data-s="1"]').click();
+  if(e.code==='Digit4')document.querySelector('[data-s="2"]').click();
+  if(e.code==='Digit5')document.querySelector('[data-s="4"]').click();
+  if(e.code==='KeyZ')clearAll();
+});
+
+function paint(e){
+  const r=cv.getBoundingClientRect();
+  const mx=((e.clientX-r.left)/PS)|0;
+  const my=((e.clientY-r.top)/PS)|0;
+  const erase=activeBtn===2||eraseMode;
+  const density=erase?1:Math.pow(brushDen/10,1.4);
+  const pts=[];
+  if(lastPX>=0&&(Math.abs(mx-lastPX)+Math.abs(my-lastPY))>brushSz){
+    const steps=Math.max(Math.abs(mx-lastPX),Math.abs(my-lastPY));
+    for(let i=0;i<=steps;i++)pts.push([Math.round(lastPX+(mx-lastPX)*i/steps),Math.round(lastPY+(my-lastPY)*i/steps)]);
+  } else pts.push([mx,my]);
+  lastPX=mx;lastPY=my;
+  pts.forEach(([cx,cy])=>{
+    if(brushShape==='line'){
+      for(let dx=-brushSz;dx<=brushSz;dx++){const px=cx+dx;if(px<0||px>=W||cy<0||cy>=H)continue;if(erase)grid[cy][px]=null;else if(replaceMode)grid[cy][px]={type:sel};else if(!grid[cy][px]&&Math.random()<density)grid[cy][px]={type:sel};}
+    } else if(brushShape==='spray'){
+      for(let i=0;i<brushSz*4;i++){const a=Math.random()*Math.PI*2,d=Math.random()*brushSz;const px=cx+(Math.cos(a)*d)|0,py=cy+(Math.sin(a)*d)|0;if(px<0||px>=W||py<0||py>=H)continue;if(erase)grid[py][px]=null;else if(!grid[py][px]&&Math.random()<density*.7)grid[py][px]={type:sel};}
+    } else {
+      for(let dy=-brushSz;dy<=brushSz;dy++) for(let dx=-brushSz;dx<=brushSz;dx++){
+        if(brushShape==='circle'&&Math.sqrt(dx*dx+dy*dy)>brushSz)continue;
+        const px=cx+dx,py=cy+dy;if(px<0||px>=W||py<0||py>=H)continue;
+        if(erase)grid[py][px]=null;
+        else if(replaceMode)grid[py][px]={type:sel};
+        else if(!grid[py][px]&&Math.random()<density)grid[py][px]={type:sel};
+      }
+    }
+  });
+}
+
+function togglePause(){paused=!paused;document.getElementById('pauseBtn').textContent=paused?'▶ Reanudar':'⏸ Pausa';document.getElementById('pauseBtn').classList.toggle('on',paused);document.getElementById('pauseOverlay').style.display=paused?'flex':'none';}
+function clearAll(){grid=makeGrid();}
+function saveImg(){const a=document.createElement('a');a.download='elemental.png';a.href=cv.toDataURL();a.click();}
+
+// ══ PHYSICS ═════════════════════════════════════════════════════════════════
+function movePowder(x,y){
+  const p=grid[y][x];if(!p)return;
+  const sp=Math.min(Math.ceil((M[p.type]?.d||1.5)/1.2),4);
+  for(let i=1;i<=sp;i++){if(y+i<H&&!grid[y+i][x]){grid[y+i][x]=p;grid[y][x]=null;return;}}
+  const d=Math.random()<.5?1:-1;
+  if(y<H-1){
+    if(x+d>=0&&x+d<W&&!grid[y+1][x+d]){grid[y+1][x+d]=p;grid[y][x]=null;return;}
+    if(x-d>=0&&x-d<W&&!grid[y+1][x-d]){grid[y+1][x-d]=p;grid[y][x]=null;}
+  }
+}
+function moveLiquid(x,y){
+  const p=grid[y][x];if(!p)return;
+  const t=p.type;
+  if(t==='glue'&&Math.random()<.88)return;
+  if(t==='honey'&&Math.random()<.82)return;
+  if(t==='tar'&&Math.random()<.92)return;
+  if(t==='oil2'&&Math.random()<.6)return;
+  if(t==='resin'&&Math.random()<.75)return;
+  if(t==='quicksand'&&Math.random()<.35)return;
+  if(y<H-1&&!grid[y+1][x]){grid[y+1][x]=p;grid[y][x]=null;return;}
+  const d=Math.random()<.5?1:-1;
+  const spread=t==='slime'?2:t==='honey'?1:t==='soap'?5:t==='mercury'?4:t==='tar'?1:t==='resin'?1:3;
+  for(let i=1;i<=spread;i++){const nx=x+d*i;if(nx>=0&&nx<W&&!grid[y][nx]){grid[y][nx]=p;grid[y][x]=null;return;}}
+}
+function moveGas(x,y,sp=0.85){
+  const p=grid[y][x];if(!p)return;
+  if(y>0&&Math.random()<sp){const nx=x+(Math.floor(Math.random()*3)-1);if(nx>=0&&nx<W&&!grid[y-1][nx]){grid[y-1][nx]=p;grid[y][x]=null;}}
+}
+function explode(x,y,r){
+  globalHeat+=r*3;
+  for(let dy=-r;dy<=r;dy+=2) for(let dx=-r;dx<=r;dx+=2){
+    const d=Math.sqrt(dx*dx+dy*dy);if(d>r)continue;
+    const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;
+    if(Math.random()>(1-d/r)*.9)continue;
+    const p=grid[ny][nx];if(p&&M[p.type]?.indes)continue;
+    grid[ny][nx]=d<r*.35?{type:'plasma',life:65}:{type:'fire',life:55};
+  }
+}
+function explodeFireworks(x,y){
+  const COLS=['#ff3333','#ff9900','#ffff00','#33ff66','#33ccff','#aa44ff','#ff44cc','#ffffff'];
+  const nb=3+Math.floor(Math.random()*4);
+  for(let b=0;b<nb;b++){
+    const bx=x+((Math.random()-.5)*24|0),by=y+((Math.random()-.5)*24|0);
+    const col=COLS[Math.floor(Math.random()*COLS.length)];
+    const rays=14+Math.floor(Math.random()*8),rad=12+Math.floor(Math.random()*16);
+    for(let i=0;i<rays;i++){
+      const ang=(Math.PI*2*i/rays)+(Math.random()-.5)*.4;
+      for(let dd=1;dd<=rad;dd++){
+        const px2=Math.round(bx+Math.cos(ang)*dd),py2=Math.round(by+Math.sin(ang)*dd);
+        if(px2<0||px2>=W||py2<0||py2>=H)continue;
+        const fade=1-dd/rad;if(Math.random()>fade*.9)continue;
+        const ep=grid[py2][px2];if(ep&&M[ep.type]?.indes)continue;
+        grid[py2][px2]={type:'fire',life:18+Math.floor(fade*60),color:col};
+      }
+    }
+  }
+  grid[y][x]=null;
+}
+function propHeat(x,y,ht,r,prob,to){
+  const q=[[x,y,0]],vis=new Set([`${x},${y}`]);
+  while(q.length){
+    const[cx,cy,d]=q.shift();if(d>=r)continue;
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;const nx=cx+dx,ny=cy+dy,k=`${nx},${ny}`;
+      if(nx>=0&&nx<W&&ny>=0&&ny<H&&!vis.has(k)){vis.add(k);const n=grid[ny][nx];
+        if(n&&n.type===ht&&Math.random()<prob/(d+1)){if(to)grid[ny][nx]={type:to};q.push([nx,ny,d+1]);}}
+  }}
+}
+
+// ══ ELECTRICITY ═════════════════════════════════════════════════════════════
+function runElec(){
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){const p=grid[y][x];if(!p)continue;p.elec=false;p.lit=false;p.powered=false;}
+  const vis=new Set();
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const p=grid[y][x];if(!p||p.type!=='electricity')continue;
+    if(vis.has(y*W+x))continue;
+    const q=[[x,y]];vis.add(y*W+x);
+    while(q.length){
+      const[cx,cy]=q.shift();
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;const nx=cx+dx,ny=cy+dy;
+        if(nx<0||nx>=W||ny<0||ny>=H)continue;
+        const idx=ny*W+nx;if(vis.has(idx))continue;
+        const nb=grid[ny][nx];if(!nb)continue;
+        if(nb.type==='rubber'||M[nb.type]?.ins)continue;
+        vis.add(idx);const mat=M[nb.type];
+        if(mat?.cond){nb.elec=true;q.push([nx,ny]);}
+        else if(nb.type==='bulb'){nb.lit=true;q.push([nx,ny]);}
+        else if(nb.type==='door'){nb.powered=true;q.push([nx,ny]);}
+        else if(nb.type==='magnet'){nb.powered=true;q.push([nx,ny]);}
+        else if(nb.type==='capacitor'){nb.charged=(nb.charged||0)+1;if(nb.charged>10){nb.charged=0;explode(nx,ny,6);}}
+        else if(nb.type==='water'&&Math.random()<.25)nb.elec=true;
+        else if((nb.type==='explosive'||nb.type==='tnt'||nb.type==='bomb')&&Math.random()<.5)explode(nx,ny,nb.type==='tnt'?22:18);
+        else if(nb.type==='neon'&&Math.random()<.5)grid[ny][nx]={type:'plasma',life:45,color:'#ff3300'};
+      }
+    }
+  }
+  // battery/torch/heater
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const p=grid[y][x];if(!p)continue;
+    if(p.type==='battery'&&Math.random()<.08){for(const[dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]){const nx=x+dx,ny=y+dy;if(nx>=0&&nx<W&&ny>=0&&ny<H&&!grid[ny][nx]){grid[ny][nx]={type:'electricity',life:14};break;}}}
+    if(p.type==='torch'&&Math.random()<.15&&y>0&&!grid[y-1][x])grid[y-1][x]={type:'fire',life:30};
+    if(p.type==='heater'){for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx>=0&&nx<W&&ny>=0&&ny<H){const nb=grid[ny][nx];if(nb&&nb.type==='water'&&Math.random()<.05)grid[ny][nx]={type:'steam',life:140};if(nb&&nb.type==='ice'&&Math.random()<.1)grid[ny][nx]={type:'water'};}}}
+    if(p.type==='cooler'){for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx>=0&&nx<W&&ny>=0&&ny<H){const nb=grid[ny][nx];if(nb&&nb.type==='water'&&Math.random()<.05)grid[ny][nx]={type:'ice'};if(nb&&nb.type==='steam'&&Math.random()<.08)grid[ny][nx]={type:'water'};}}}
+    if(p.type==='fan'){if(y>1&&Math.random()<.3){const nb=grid[y-1][x];if(nb&&(M[nb.type]?.t==='gas'||M[nb.type]?.t==='powder')){const tx=x+(Math.random()-.5>0?1:-1);if(tx>=0&&tx<W&&!grid[y-2][tx]){grid[y-2][tx]=nb;grid[y-1][x]=null;}}}}
+  }
+}
+
+const DOOR_EXP=6;
+function updDoor(x,y){const p=grid[y][x];if(!p||p.type!=='door')return;if(p.powered&&!p.expanded&&!p.isExt){for(const ddx of[-1,1]) for(let s=1;s<=DOOR_EXP;s++){const nx=x+ddx*s;if(nx>=0&&nx<W&&!grid[y][nx])grid[y][nx]={type:'door',expanded:true,isExt:true};else break;}p.expanded=true;}else if(!p.powered&&p.expanded&&!p.isExt){for(let ddx=-(DOOR_EXP+2);ddx<=(DOOR_EXP+2);ddx++){const nx=x+ddx;if(nx>=0&&nx<W&&nx!==x){const nb=grid[y][nx];if(nb&&nb.type==='door'&&nb.isExt)grid[y][nx]=null;}}p.expanded=false;}}
+function updMagnet(x,y){const p=grid[y][x];if(!p||p.type!=='magnet'||!p.powered)return;const r=12;for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){if(Math.sqrt(dx*dx+dy*dy)>r)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(!nb)continue;if(!M[nb.type]?.cond&&nb.type!=='mercury')continue;const tx=nx+Math.sign(x-nx),ty=ny+Math.sign(y-ny);if(tx>=0&&tx<W&&ty>=0&&ty<H&&!grid[ty][tx]&&(tx!==x||ty!==y)){grid[ty][tx]=nb;grid[ny][nx]=null;}}}
+function updSponge(x,y){const p=grid[y][x];if(!p||p.type!=='sponge')return;if((p.absorbed||0)>=30)return;for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&(nb.type==='water'||nb.type==='slime'||nb.type==='blood'||nb.type==='milk')&&Math.random()<.3){grid[ny][nx]=null;p.absorbed=(p.absorbed||0)+1;return;}}}
+function updCryo(x,y){const p=grid[y][x];if(!p||p.type!=='cryo')return;for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(!nb)continue;if(nb.type==='water'&&Math.random()<.15)grid[ny][nx]={type:'ice'};else if(nb.type==='steam'&&Math.random()<.2)grid[ny][nx]={type:'water'};else if((nb.type==='fire'||nb.type==='lava'||nb.type==='plasma')&&Math.random()<.3)grid[ny][nx]={type:'water'};else if(nb.type==='lava2'&&Math.random()<.2)grid[ny][nx]={type:'glass2'};}}
+function updCondenser(x,y){const p=grid[y][x];if(!p||p.type!=='condenser')return;for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(!nb)continue;if(nb.type==='steam'&&Math.random()<.3)grid[ny][nx]={type:'water'};if(nb.type==='smoke'&&Math.random()<.05)grid[ny][nx]=null;}}
+function updFirestone(x,y){const p=grid[y][x];if(!p||p.type!=='firestone')return;for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(!nb)continue;if(nb.type==='water'&&Math.random()<.2)grid[ny][nx]={type:'steam',life:160};if(nb.type==='ice'&&Math.random()<.15)grid[ny][nx]={type:'water'};}}
+function updCloner(x,y){const p=grid[y][x];if(!p||p.type!=='cloner')return;if(!p.stored){for(const[dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]){const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&nb.type!=='cloner'){p.stored=nb.type;break;}}}else if(Math.random()<.08){for(const[dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]){const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;if(!grid[ny][nx]){grid[ny][nx]={type:p.stored};break;}}}}
+function updPump(x,y){const p=grid[y][x];if(!p||p.type!=='pump')return;if(y>0&&y<H-1){const below=grid[y+1][x];const above=grid[y-1][x];if(below&&M[below.type]?.t==='liquid'&&!above&&Math.random()<.2){grid[y-1][x]=below;grid[y+1][x]=null;}}}
+function updFilter(x,y){const p=grid[y][x];if(!p||p.type!=='filter')return;for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&(nb.type==='smoke'||nb.type==='poison'||nb.type==='chlorine'||nb.type==='co2')&&Math.random()<.15)grid[ny][nx]=null;}}
+
+// ══ UPDATE ══════════════════════════════════════════════════════════════════
+function updParticle(x,y){
+  const p=grid[y][x];if(!p)return;
+  const type=p.type;const mat=M[type];if(!mat)return;
+  if(mat.indes)return;
+  if(p.life!==undefined){p.life--;if(p.life<=0){grid[y][x]=(type==='fire'||type==='plasma')&&Math.random()<.3?{type:'smoke',life:100}:type==='fire'&&Math.random()<.15?{type:'ash'}:null;return;}}
+
+  if(type==='door')updDoor(x,y);
+  if(type==='magnet')updMagnet(x,y);
+  if(type==='sponge')updSponge(x,y);
+  if(type==='cryo')updCryo(x,y);
+  if(type==='firestone')updFirestone(x,y);
+  if(type==='condenser')updCondenser(x,y);
+  if(type==='cloner')updCloner(x,y);
+  if(type==='pump')updPump(x,y);
+  if(type==='filter')updFilter(x,y);
+
+  // ember — slowly burns everything nearby
+  if(type==='ember'){for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&(M[nb.type]?.flam)&&Math.random()<.05)grid[ny][nx]={type:'fire',life:80};} return;}
+
+  // SPARK — ultra-short lived, spreads fire
+  if(type==='spark'){moveGas(x,y,.95);for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&M[nb.type]?.flam&&Math.random()<.3){grid[ny][nx]={type:'fire',life:60};}}return;}
+
+  // CRYSTAL — grows slowly in water
+  if(type==='crystal'){for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&nb.type==='saltwater'&&Math.random()<.004){grid[ny][nx]={type:'crystal'};}}return;}
+
+  // BUBBLE — rises fast, pops on contact with solid
+  if(type==='bubble'){moveGas(x,y,.99);for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&M[nb.type]?.t==='solid'){grid[y][x]={type:'foam',life:60};return;}}return;}
+
+  // FOAM — slowly rises and disappears
+  if(type==='foam'){moveGas(x,y,.5);return;}
+
+  // ACID_GAS — drifts, corrodes things
+  if(type==='acid_gas'){moveGas(x,y,.75);for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&(nb.type==='stone'||nb.type==='concrete'||nb.type==='metal')&&Math.random()<.02){grid[ny][nx]={type:'rust'};}}return;}
+
+  // MAGMA_ROCK — hot powder that slowly cools to stone
+  if(type==='magma_rock'){movePowder(x,y);if(Math.random()<.002){grid[y][x]={type:'stone'};}for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&nb.type==='water'&&Math.random()<.1){grid[ny][nx]={type:'steam',life:100};}}checkReact(x,y);return;}
+
+  // SALTWATER — slightly denser water, grows crystals
+  if(type==='saltwater'){moveLiquid(x,y);if(Math.random()<.0002)grid[y][x]={type:'crystal'};checkReact(x,y);return;}
+
+  // STEAM_HOT — hotter steam, rises faster
+  if(type==='steam_hot'){moveGas(x,y,.98);for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&nb.type==='water'&&Math.random()<.05)grid[ny][nx]={type:'steam_hot',life:60};}return;}
+
+  // GEL — ultra-viscous, insulates heat
+  if(type==='gel'){if(Math.random()<.05)moveLiquid(x,y);return;}
+
+  // LAVA_ROCK — semi-solid hot rock
+  if(type==='lava_rock'){if(Math.random()<.003)grid[y][x]={type:'stone'};for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&nb.type==='water'&&Math.random()<.12){grid[ny][nx]={type:'steam',life:100};}}return;}
+
+  // AMBER — preserves particles it touches (doesn't react)
+  if(type==='amber')return;
+
+  // GEL2/OBSIDIAN2 just sits there
+  if(type==='obsidian2')return;
+
+  // neutron star — extreme gravity + radiation
+  if(type==='neutronStar'){const r=20;for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){const d=Math.sqrt(dx*dx+dy*dy);if(d>r||d<2)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(!nb||nb.type==='neutronStar'||M[nb.type]?.indes)continue;const prob=(1-d/r)*.12;if(Math.random()<prob){const tx=nx+Math.sign(x-nx),ty=ny+Math.sign(y-ny);if(tx>=0&&tx<W&&ty>=0&&ty<H&&!grid[ty][tx]){grid[ty][tx]=nb;grid[ny][nx]=null;}}}return;}
+
+  if(type==='harvester'){if(!p.vx)p.vx=1;p.mt=(p.mt||0)+1;if(p.mt<4)return;p.mt=0;const nx=x+p.vx;if(nx<0||nx>=W){p.vx=-p.vx;return;}const tgt=grid[y][nx];if(tgt&&tgt.type!=='harvester'&&!M[tgt.type]?.indes)grid[y][nx]=null;if(!grid[y][nx]){grid[y][nx]=p;grid[y][x]=null;}else p.vx=-p.vx;return;}
+  if(type==='void'){for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&!M[nb.type]?.indes&&nb.type!=='void'&&nb.type!=='obsidian'&&Math.random()<.18)grid[ny][nx]=null;}return;}
+  if(type==='blackhole'){const r=15;for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){const d=Math.sqrt(dx*dx+dy*dy);if(d>r||d<1)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(!nb||nb.type==='blackhole'||M[nb.type]?.indes)continue;if(Math.random()<(1-d/r)*.08){const tx=nx+Math.sign(x-nx),ty=ny+Math.sign(y-ny);if(tx>=0&&tx<W&&ty>=0&&ty<H&&!grid[ty][tx])grid[ty][tx]=nb;grid[ny][nx]=null;}}return;}
+  if(type==='antimatter'){for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&nb.type!=='antimatter'&&!M[nb.type]?.indes&&Math.random()<.12){grid[ny][nx]={type:'plasma',life:50};explode(nx,ny,3);}}return;}
+  if(type==='comet'){movePowder(x,y);if(Math.random()<.3&&y>0&&!grid[y-1][x])grid[y-1][x]={type:'stardust',life:60};checkReact(x,y);return;}
+  // grenade / mine
+  if(type==='grenade'){p.timer=(p.timer||0)+1;if(p.timer>120){explode(x,y,14);grid[y][x]=null;return;}movePowder(x,y);return;}
+  if(type==='mine'){for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const nb=grid[ny][nx];if(nb&&nb.type!=='mine'&&M[nb.type]?.t!=='gas'&&Math.random()<.5){explode(x,y,16);grid[y][x]=null;return;}}return;}
+  // mycelium — like fungus but spreads on powder
+  if(type==='mycelium'){if(Math.random()<.004){const d2=[[0,-1],[0,1],[-1,0],[1,0]][Math.floor(Math.random()*4)];const nx=x+d2[0],ny=y+d2[1];if(nx>=0&&nx<W&&ny>=0&&ny<H){const nb=grid[ny][nx];if(nb&&M[nb.type]?.t==='powder')grid[ny][nx]={type:'mycelium'};else if(!nb)grid[ny][nx]={type:'spore',life:80};}}return;}
+  // spore — floats like gas, germinates on soil
+  if(type==='spore'){moveGas(x,y,.7);if(y<H-1&&grid[y+1][x]&&(grid[y+1][x].type==='dirt'||grid[y+1][x].type==='mud')&&Math.random()<.01){grid[y][x]={type:'mycelium'};return;}checkReact(x,y);return;}
+  // nebula — shimmering gas that reacts with everything slowly
+  if(type==='nebula'){moveGas(x,y,.4);if(Math.random()<.002){for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx>=0&&nx<W&&ny>=0&&ny<H&&!grid[ny][nx])grid[ny][nx]={type:'stardust',life:40};}}checkReact(x,y);return;}
+
+  if(mat.t==='powder')movePowder(x,y);
+  else if(mat.t==='liquid')moveLiquid(x,y);
+  else if(mat.t==='gas'){const sp=type==='hydrogen'?.98:type==='helium'?.99:type==='methane'?.96:type==='stardust'?.6:type==='argon'?.4:.85;moveGas(x,y,sp);}
+
+  checkReact(x,y);
+}
+
+// ══ REACTIONS ═══════════════════════════════════════════════════════════════
+function checkReact(x,y){
+  const p=grid[y][x];if(!p)return;const type=p.type;
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+    if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
+    if(nx<0||nx>=W||ny<0||ny>=H)continue;
+    const nb=grid[ny][nx];if(!nb)continue;
+    if(M[nb.type]?.indes)continue;
+    if(type==='rubber'||nb.type==='rubber'||M[type]?.ins||M[nb.type]?.ins)continue;
+
+    // slime
+    if((type==='slime'&&nb.type==='acid')||(type==='acid'&&nb.type==='slime'))if(Math.random()<.2){grid[y][x]=null;grid[ny][nx]=null;return;}
+    if(type==='slime'&&nb.type==='water'&&Math.random()<.04)grid[ny][nx]={type:'slime'};
+
+    // new: vinegar + stone = slow erosion
+    if(type==='vinegar'&&(nb.type==='stone'||nb.type==='concrete')&&Math.random()<.01){grid[ny][nx]={type:'sand'};if(Math.random()<.3)grid[y][x]=null;return;}
+    // vinegar + milk = curdled faster
+    if(type==='vinegar'&&nb.type==='milk'&&Math.random()<.1){grid[ny][nx]={type:'stone'};return;}
+    // resin + fire = burns slowly
+    if(type==='resin'&&(nb.type==='fire'||nb.type==='lava')&&Math.random()<.06){grid[y][x]={type:'fire',life:200};return;}
+    // resin + air (nothing) = hardens slowly
+    // oil2 + electricity = fire
+    if(type==='oil2'&&nb.type==='electricity'&&Math.random()<.3){grid[y][x]={type:'fire',life:200};return;}
+    // glass3 + lava = glass3 stays (heat-resistant)
+    // ceramic + lava = stays (fireproof)
+    if(type==='ceramic'&&(nb.type==='lava'||nb.type==='fire')&&Math.random()<.001){grid[y][x]={type:'brick'};return;}
+    // argon is inert (no reactions — noble gas)
+    if(type==='argon')continue;
+    // nebula + stardust = plasma explosion
+    if(type==='nebula'&&nb.type==='stardust'&&Math.random()<.05){grid[y][x]={type:'plasma',life:80};grid[ny][nx]={type:'plasma',life:80};return;}
+
+    // existing reactions
+    if(type==='milk'&&nb.type==='acid'&&Math.random()<.05){grid[y][x]={type:'stone'};return;}
+    if(type==='lemonade'&&(nb.type==='fire'||nb.type==='lava')&&Math.random()<.2){grid[y][x]={type:'steam',life:120};return;}
+    if(type==='alcohol'&&(nb.type==='fire'||nb.type==='lava')&&Math.random()<.3){grid[y][x]={type:'fire',life:200};return;}
+    if(type==='poison'&&nb.type==='water'&&Math.random()<.02){grid[ny][nx]={type:'poison'};return;}
+    if(type==='tar'&&(nb.type==='fire'||nb.type==='lava')&&Math.random()<.1){grid[y][x]={type:'smoke',life:220,color:'#222200'};return;}
+    if(type==='ink'&&nb.type==='water'&&Math.random()<.02){grid[ny][nx]={type:'ink'};return;}
+    if(type==='wax'&&(nb.type==='fire'||nb.type==='lava')&&Math.random()<.08){grid[y][x]={type:'fire',life:120};return;}
+    if(type==='moss'&&(nb.type==='dirt'||nb.type==='stone')&&Math.random()<.003){const d2=[[0,-1],[-1,0],[1,0]][Math.floor(Math.random()*3)];const mx2=x+d2[0],my2=y+d2[1];if(mx2>=0&&mx2<W&&my2>=0&&my2<H&&!grid[my2][mx2])grid[my2][mx2]={type:'moss'};}
+    if(type==='cactus'&&nb.type==='water'&&Math.random()<.02){grid[ny][nx]=null;}
+    if(type==='fungus'&&(nb.type==='dirt'||nb.type==='wood')&&Math.random()<.005)grid[ny][nx]={type:'fungus'};
+    if(type==='fungus'&&(nb.type==='fire'||nb.type==='lava'||nb.type==='plasma')&&Math.random()<.3){grid[y][x]=null;return;}
+    if(type==='algae'&&nb.type==='water'&&Math.random()<.003){const d2=[[-1,0],[1,0],[0,-1],[0,1]][Math.floor(Math.random()*4)];const ax=x+d2[0],ay=y+d2[1];if(ax>=0&&ax<W&&ay>=0&&ay<H&&!grid[ay][ax])grid[ay][ax]={type:'algae'};}
+
+    // salt+water
+    if(type==='salt'&&nb.type==='water'&&Math.random()<.04){grid[y][x]=null;nb.salted=true;nb.color='#88ccff';return;}
+    // sand+water=mud
+    if(type==='sand'&&nb.type==='water'&&Math.random()<.006){grid[y][x]={type:'mud'};grid[ny][nx]=null;return;}
+    // carbon+lava=diamond
+    if(type==='carbon'&&(nb.type==='lava'||nb.type==='magma'||nb.type==='plasma')&&Math.random()<.002){grid[y][x]={type:'diamond'};return;}
+    // oil+electricity
+    if((type==='oil'||type==='petroleum')&&nb.type==='electricity'&&Math.random()<.4){grid[y][x]={type:'fire',life:160};return;}
+    // sulfur+water=acid
+    if(type==='sulfur'&&nb.type==='water'&&Math.random()<.015){grid[y][x]={type:'acid'};grid[ny][nx]={type:'acid'};return;}
+    // glass+neutron=sand
+    if((type==='glass'||type==='glass2')&&nb.type==='neutron'&&Math.random()<.5){grid[y][x]={type:'sand'};grid[ny][nx]=null;return;}
+    // water+electricity=electrolysis
+    if(type==='water'&&nb.type==='electricity'&&Math.random()<.05){
+      grid[y][x]={type:'hydrogen',life:190};
+      const ox=x+(Math.floor(Math.random()*3)-1),oy=y-1;
+      if(ox>=0&&ox<W&&oy>=0&&!grid[oy][ox])grid[oy][ox]={type:'oxygen',life:210};
+      return;
+    }
+    // rust on metal near water
+    if(type==='rust'&&nb.type==='water'&&Math.random()<.005){
+      for(let dy2=-2;dy2<=2;dy2++) for(let dx2=-2;dx2<=2;dx2++){
+        const mx2=x+dx2,my2=y+dy2;
+        if(mx2>=0&&mx2<W&&my2>=0&&my2<H&&grid[my2][mx2]&&(grid[my2][mx2].type==='metal'||grid[my2][mx2].type==='copper')&&Math.random()<.02)grid[my2][mx2]={type:'rust'};
+      }
+    }
+    // portal
+    if(type==='portal'&&Math.random()<.05&&nb.type!=='portal'&&nb.type!=='obsidian'){
+      for(let py=Math.max(0,y-100);py<Math.min(H,y+100);py+=5) for(let px=Math.max(0,x-100);px<Math.min(W,x+100);px+=5){
+        const pp=grid[py][px];if(pp&&pp.type==='portal'&&(px!==x||py!==y)){
+          for(let ty=-2;ty<=2;ty++) for(let tx=-2;tx<=2;tx++){const tpx=px+tx,tpy=py+ty;if(tpx>=0&&tpx<W&&tpy>=0&&tpy<H&&!grid[tpy][tpx]){grid[tpy][tpx]=nb;grid[ny][nx]=null;return;}}
+        }
+      }
+    }
+  }
+
+  // burning
+  const type2=p.type;
+  if(type2==='wood'&&p.burning){p.burnTime=(p.burnTime||160)-1;if(p.burnTime<=0)grid[y][x]={type:'fire',life:35};else if(Math.random()<.1&&y>0&&!grid[y-1][x])grid[y-1][x]={type:'smoke',life:130};}
+  if(type2==='coal'&&p.burning){p.burnTime=(p.burnTime||320)-1;if(p.burnTime<=0)grid[y][x]={type:'ash'};else if(Math.random()<.18&&y>0&&!grid[y-1][x])grid[y-1][x]={type:'fire',life:75};}
+  if(type2==='wax'&&p.burning){p.burnTime=(p.burnTime||80)-1;if(p.burnTime<=0)grid[y][x]={type:'fire',life:30};}
+
+  // plant
+  if(type2==='plant'){
+    let gotW=false;
+    for(const[wd,wdy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){
+      const wx=x+wd,wy=y+wdy;
+      if(wx>=0&&wx<W&&wy>=0&&wy<H&&grid[wy][wx]&&grid[wy][wx].type==='water'&&Math.random()<.15){grid[wy][wx]=null;gotW=true;break;}
+    }
+    if(gotW){p.waterTimer=0;if(p.dried){p.dried=false;p.color=undefined;}}
+    else p.waterTimer=(p.waterTimer||0)+1;
+    if(p.waterTimer>900&&!p.dried){p.dried=true;p.color='#c8a060';}
+    if(!p.dried&&p.waterTimer<300&&Math.random()<.015){
+      p.growth=(p.growth||0)+1;
+      if(p.growth<8){const dirs=[[0,-1],[-1,0],[1,0]],d2=dirs[Math.floor(Math.random()*3)],nx=x+d2[0],ny=y+d2[1];if(nx>=0&&nx<W&&ny>=0&&ny<H&&!grid[ny][nx])grid[ny][nx]={type:'plant',growth:0,waterTimer:p.waterTimer};}
+    }
+  }
+  // fungus
+  if(type2==='fungus'&&Math.random()<.003){
+    const d2=[[0,-1],[0,1],[-1,0],[1,0]][Math.floor(Math.random()*4)];
+    const nx=x+d2[0],ny=y+d2[1];
+    if(nx>=0&&nx<W&&ny>=0&&ny<H){const nb=grid[ny][nx];if(nb&&(nb.type==='dirt'||nb.type==='wood'))grid[ny][nx]={type:'fungus'};else if(!nb)grid[ny][nx]={type:'fungus'};}
+  }
+  // uranium emits neutrons
+  if(type2==='uranium'&&Math.random()<.01){
+    const a=Math.random()*Math.PI*2,nx=Math.round(x+Math.cos(a)),ny=Math.round(y+Math.sin(a));
+    if(nx>=0&&nx<W&&ny>=0&&ny<H&&!grid[ny][nx])grid[ny][nx]={type:'neutron',life:55};
+  }
+  // obsidian portal check
+  if(type2==='obsidian'&&Math.random()<.02)checkPortal(x,y);
+}
+
+function checkPortal(x,y){
+  for(let w=3;w<=6;w++) for(let h=4;h<=8;h++){
+    if(!validPortal(x,y,w,h))continue;
+    let fire=false;
+    outer:for(let dy=1;dy<h-1;dy++) for(let dx=1;dx<w-1;dx++){const c=grid[y+dy][x+dx];if(c&&(c.type==='fire'||c.type==='lava'||c.type==='plasma')){fire=true;break outer;}}
+    if(fire){for(let dy=1;dy<h-1;dy++) for(let dx=1;dx<w-1;dx++) grid[y+dy][x+dx]={type:'portal'};return;}
+  }
+}
+function validPortal(x,y,w,h){
+  if(x+w>W||y+h>H)return false;
+  for(let dx=0;dx<w;dx++){if(!grid[y][x+dx]||grid[y][x+dx].type!=='obsidian')return false;if(!grid[y+h-1][x+dx]||grid[y+h-1][x+dx].type!=='obsidian')return false;}
+  for(let dy=0;dy<h;dy++){if(!grid[y+dy][x]||grid[y+dy][x].type!=='obsidian')return false;if(!grid[y+dy][x+w-1]||grid[y+dy][x+w-1].type!=='obsidian')return false;}
+  return true;
+}
+
+// ══ RENDER ═══════════════════════════════════════════════════════════════════
+function hexRgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+
+function render() {
+  const t=Date.now();
+  buf.fill(0);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const p=grid[y][x];if(!p)continue;
+    const mat=M[p.type];if(!mat)continue;
+    let r=128,g=128,b=128;
+    let col=mat.c;if(p.color)col=p.color;
+    const type=p.type;
+
+    // animated colors
+    if(type==='lava'){const v=Math.sin(t/220)*.2+.8;r=255*v|0;g=69*v|0;b=0;}
+    else if(type==='lava2'){const v=Math.sin(t/220)*.2+.8;r=30*v|0;g=50*v|0;b=255*v|0;}
+    else if(type==='magma'){const v=Math.sin(t/160)*.3+.7;r=255*v|0;g=102*v|0;b=0;}
+    else if(type==='plasma'||type==='antimatter'){const v=Math.sin(t/100)*.5+.5;if(p.color){[r,g,b]=hexRgb(p.color);}else{r=255*v|0;g=0;b=255*(1-v)|0;}}
+    else if(type==='portal'){const v=Math.sin(t/100)*.3+.7;r=139*v|0;g=0;b=255*v|0;}
+    else if(type==='uranium'){const v=Math.sin(t/300)*.3+.7;r=0;g=255*v|0;b=0;}
+    else if(type==='electricity'){const v=Math.random();r=g=255*v|0;b=0;}
+    else if(type==='fireworks'){const hue=(t/8+x*7+y*13)%360;r=127+127*Math.sin(hue*Math.PI/180)|0;g=127+127*Math.sin((hue+120)*Math.PI/180)|0;b=127+127*Math.sin((hue+240)*Math.PI/180)|0;}
+    else if(type==='stardust'){const v=Math.random()*.5+.5;r=255;g=170*v|0;b=255;}
+    else if(type==='comet'){const v=Math.sin(t/80)*.3+.7;r=136*v|0;g=200*v|0;b=255;}
+    else if(type==='darkMatter'){const v=Math.sin(t/800)*.15+.15;r=30*v|0;g=0;b=40*v|0;}
+    else if(type==='blackhole'){const v=Math.sin(t/300)*.1+.1;r=15*v|0;g=0;b=25*v|0;}
+    else if(p.elec){const v=Math.sin(t/50)*.5+.5;r=100+155*v|0;g=150+105*v|0;b=255;}
+    else if(type==='bulb'&&p.lit){const v=Math.sin(t/80)*.3+.7;r=255;g=230+25*v|0;b=80*v|0;}
+    else if(type==='bulb'&&!p.lit){r=g=85;b=68;}
+    else if(type==='door'&&p.powered){const v=Math.sin(t/100)*.2+.8;r=200*v|0;g=100*v|0;b=20*v|0;}
+    else if(type==='door'&&!p.powered){r=90;g=48;b=8;}
+    else if(type==='harvester'){const v=Math.sin(t/80)*.3+.7;r=255;g=100+60*v|0;b=0;}
+    else if(type==='magnet'&&p.powered){const v=Math.sin(t/60)*.5+.5;r=255;g=50+100*v|0;b=50+50*v|0;}
+    else if(type==='magnet'&&!p.powered){r=180;g=44;b=44;}
+    else if(type==='cryo'){const v=Math.sin(t/400)*.2+.8;r=153*v|0;g=210*v|0;b=255;}
+    else if(type==='diamond'){const v=Math.sin(t/200)*.3+.7;r=185+70*v|0;g=242+13*v|0;b=255;}
+    else if(type==='sponge'){const fill=(p.absorbed||0)/30;r=204-fill*80|0;g=170-fill*90|0;b=70;}
+    else if(type==='condenser'){const v=Math.sin(t/900)*.08+.92;r=50*v|0;g=100*v|0;b=136*v|0;}
+    else if(type==='firestone'){const v=Math.sin(t/200)*.25+.75;r=204*v|0;g=34*v|0;b=0;}
+    else if(type==='battery'){const v=Math.sin(t/300)*.3+.7;r=68*v|0;g=180*v|0;b=68*v|0;}
+    else if(type==='torch'){const v=Math.sin(t/100)*.4+.6;r=255;g=120+80*v|0;b=0;}
+    else if(type==='cloner'){const v=Math.sin(t/200)*.4+.6;r=180*v|0;g=68*v|0;b=255*v|0;}
+    else if(type==='pump'){const v=Math.sin(t/150)*.3+.7;r=68*v|0;g=136*v|0;b=200*v|0;}
+    else if(type==='filter'){const v=Math.sin(t/400)*.2+.8;r=68*v|0;g=136*v|0;b=136*v|0;}
+    else if(type==='slime'){const v=Math.sin(t/300)*.2+.8;r=50*v|0;g=240*v|0;b=100*v|0;}
+    else if(type==='glue'){const v=Math.sin(t/500)*.1+.9;r=255*v|0;g=200*v|0;b=100*v|0;}
+    else if(type==='honey'){const v=Math.sin(t/400)*.15+.85;r=255*v|0;g=170*v|0;b=0;}
+    else if(type==='blood'){const v=Math.sin(t/600)*.1+.9;r=170*v|0;g=17*v|0;b=34*v|0;}
+    else if(type==='fungus'){const v=Math.sin(t/400)*.2+.8;r=180*v|0;g=100*v|0;b=255*v|0;}
+    else if(type==='coral'){const v=Math.sin(t/600)*.2+.8;r=255;g=100+27*v|0;b=100*v|0;}
+    else if(type==='algae'){const v=Math.sin(t/500)*.15+.85;r=34*v|0;g=136*v|0;b=51*v|0;}
+    else if(type==='moss'){const v=Math.sin(t/700)*.1+.9;r=50*v|0;g=100*v|0;b=34*v|0;}
+    else if(type==='glass2'||type==='lemonade'){const v=Math.sin(t/300)*.2+.8;[r,g,b]=hexRgb(mat.c);r=r*v|0;g=g*v|0;b=b*v|0;}
+    else if(type==='soap'){const hue=(t/6+x*3+y*5)%360;r=200+55*Math.sin(hue*Math.PI/180)|0;g=200+55*Math.sin((hue+120)*Math.PI/180)|0;b=200+55*Math.sin((hue+240)*Math.PI/180)|0;}
+    else if(type==='neon'){const v=Math.sin(t/120)*.4+.6;const v2=Math.sin(t/80+1)*.5+.5;r=255*v|0;g=58+40*v2|0;b=0;}
+    else if(type==='crystal'){const v=Math.sin(t/200+x*.1+y*.07)*.4+.6;r=170*v|0;g=255*v|0;b=238*v|0;}
+    else if(type==='bubble'){const v=Math.sin(t/80+x*.3+y*.2)*.5+.5;r=200+55*Math.sin(v*Math.PI)|0;g=220+35*Math.sin(v*Math.PI+2)|0;b=255;buf[((y*PS)*CW+(x*PS))*4+3]=120;} // semi-transparent
+    else if(type==='foam'){const v=Math.sin(t/100)*.2+.8;r=g=b=220+35*v|0;}
+    else if(type==='spark'){r=255;g=255;b=100+155*Math.random()|0;}
+    else if(type==='acid_gas'){const v=Math.sin(t/150)*.3+.7;r=100+80*v|0;g=255*v|0;b=50*v|0;}
+    else if(type==='saltwater'){const v=Math.sin(t/400)*.1+.9;r=100*v|0;g=160*v|0;b=255*v|0;}
+    else if(type==='steam_hot'){const v=Math.sin(t/100)*.3+.7;r=255;g=200*v|0;b=150*v|0;}
+    else if(type==='gel'){const v=Math.sin(t/300+x*.05)*.2+.8;r=100*v|0;g=255*v|0;b=180*v|0;}
+    else if(type==='lava_rock'){const v=Math.sin(t/300)*.15+.85;r=90*v|0;g=50*v|0;b=30*v|0;}
+    else if(type==='magma_rock'){const v=Math.sin(t/200)*.3+.7;r=120+80*v|0;g=60*v|0;b=10*v|0;}
+    else if(type==='amber'){const v=Math.sin(t/500)*.1+.9;r=221*v|0;g=136*v|0;b=0;}
+    else if(type==='obsidian2'){const v=Math.sin(t/800)*.1+.1;r=50*v|0;g=0;b=20*v|0;}
+    else if(type==='void'){r=g=b=5;}
+    else if(col.startsWith('#')&&col.length===7)[r,g,b]=hexRgb(col);
+    else{const m2=col.match(/rgb\((\d+),(\d+),(\d+)\)/);if(m2){r=+m2[1];g=+m2[2];b=+m2[3];}}
+
+    for(let py=0;py<PS;py++) for(let px=0;px<PS;px++){
+      const idx=((y*PS+py)*CW+(x*PS+px))*4;
+      buf[idx]=r;buf[idx+1]=g;buf[idx+2]=b;buf[idx+3]=255;
+    }
+  }
+  imgData.data.set(buf);
+  ctx.putImageData(imgData,0,0);
+}
+
+// ══ MAIN LOOP ════════════════════════════════════════════════════════════════
+const heatWords=['❄ Frío','🌡 Templado','🌤 Cálido','🔥 Caliente','💀 INFERNO'];
+
+function loop(ts) {
+  requestAnimationFrame(loop);
+  const dt=ts-lastT;lastT=ts;
+  fpsArr.push(1000/Math.max(1,dt));
+  if(fpsArr.length>30)fpsArr.shift();
+
+  if(ts-lastFpsT>500){
+    lastFpsT=ts;
+    const fps=Math.round(fpsArr.reduce((a,b)=>a+b,0)/fpsArr.length);
+    document.getElementById('sFps').textContent=fps;
+    document.getElementById('iFps').textContent=fps;
+    document.getElementById('iFrame').textContent=frame;
+    let cnt=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(grid[y][x])cnt++;
+    document.getElementById('sPart').textContent=cnt.toLocaleString();
+    document.getElementById('iPart').textContent=cnt.toLocaleString();
+    globalHeat=Math.max(0,globalHeat*.92);
+    const hpct=Math.min(100,globalHeat/2);
+    const hli=Math.min(4,Math.floor(hpct/20));
+    const hw=heatWords[hli];
+    document.getElementById('heatStat').textContent=hw;
+    document.getElementById('iHeat').textContent=hw;
+    const hf=document.getElementById('heatFill');
+    hf.style.width=hpct+'%';
+    hf.style.background=hpct>70?'#ff2200':hpct>40?'#ff8800':hpct>20?'#ffcc00':'#4488cc';
+  }
+
+  if(!paused){
+    acc+=dt*simSpeed;
+    const tick=16.7;
+    while(acc>=tick){
+      acc-=tick;frame++;
+      runElec();
+      const ltr=frame%2===0;
+      for(let y=H-1;y>=0;y--){
+        if(ltr)for(let x=0;x<W;x++){if(grid[y][x])updParticle(x,y);}
+        else for(let x=W-1;x>=0;x--){if(grid[y][x])updParticle(x,y);}
+      }
+      if(acc>tick*4){acc=0;break;}
+    }
+  }
+  render();
+}
+
+// ══ INIT ═════════════════════════════════════════════════════════════════════
+buildPicker();
+resizeCanvas();
+window.addEventListener('resize',()=>{ resizeCanvas(); });
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
